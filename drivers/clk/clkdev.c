@@ -153,7 +153,7 @@ struct clk_lookup_alloc {
 	char	con_id[MAX_CON_ID];
 };
 
-static struct clk_lookup * __ref
+static __printf(3, 0) struct clk_lookup * __ref
 vclkdev_alloc(struct clk_hw *hw, const char *con_id, const char *dev_fmt,
 	va_list ap)
 {
@@ -204,11 +204,18 @@ fail:
 	pr_err("%pV:%s: %s ID is greater than %zu\n",
 	       &vaf, con_id, failure, max_size);
 	va_end(ap_copy);
-	kfree(cla);
-	return NULL;
+
+	/*
+	 * Don't fail in this case, but as the entry won't ever match just
+	 * fill it with something that also won't match.
+	 */
+	strscpy(cla->con_id, "bad", sizeof(cla->con_id));
+	strscpy(cla->dev_id, "bad", sizeof(cla->dev_id));
+
+	return &cla->cl;
 }
 
-static struct clk_lookup *
+static __printf(3, 0) struct clk_lookup *
 vclkdev_create(struct clk_hw *hw, const char *con_id, const char *dev_fmt,
 	va_list ap)
 {
@@ -296,9 +303,8 @@ void clkdev_drop(struct clk_lookup *cl)
 }
 EXPORT_SYMBOL(clkdev_drop);
 
-static struct clk_lookup *__clk_register_clkdev(struct clk_hw *hw,
-						const char *con_id,
-						const char *dev_id, ...)
+static __printf(3, 4) struct clk_lookup *
+__clk_register_clkdev(struct clk_hw *hw, const char *con_id, const char *dev_id, ...)
 {
 	struct clk_lookup *cl;
 	va_list ap;

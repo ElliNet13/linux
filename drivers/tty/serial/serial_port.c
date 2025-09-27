@@ -64,6 +64,13 @@ static int serial_port_runtime_suspend(struct device *dev)
 	if (port->flags & UPF_DEAD)
 		return 0;
 
+	/*
+	 * Nothing to do on pm_runtime_force_suspend(), see
+	 * DEFINE_RUNTIME_DEV_PM_OPS.
+	 */
+	if (!pm_runtime_enabled(dev))
+		return 0;
+
 	uart_port_lock_irqsave(port, &flags);
 	if (!port_dev->tx_enabled) {
 		uart_port_unlock_irqrestore(port, flags);
@@ -166,6 +173,7 @@ EXPORT_SYMBOL(uart_remove_one_port);
  * The caller is responsible to initialize the following fields of the @port
  *   ->dev (must be valid)
  *   ->flags
+ *   ->iobase
  *   ->mapbase
  *   ->mapsize
  *   ->regshift (if @use_defaults is false)
@@ -207,7 +215,7 @@ static int __uart_read_properties(struct uart_port *port, bool use_defaults)
 	/* Read the registers I/O access type (default: MMIO 8-bit) */
 	ret = device_property_read_u32(dev, "reg-io-width", &value);
 	if (ret) {
-		port->iotype = UPIO_MEM;
+		port->iotype = port->iobase ? UPIO_PORT : UPIO_MEM;
 	} else {
 		switch (value) {
 		case 1:
@@ -220,13 +228,14 @@ static int __uart_read_properties(struct uart_port *port, bool use_defaults)
 			port->iotype = device_is_big_endian(dev) ? UPIO_MEM32BE : UPIO_MEM32;
 			break;
 		default:
-			if (!use_defaults) {
-				dev_err(dev, "Unsupported reg-io-width (%u)\n", value);
-				return -EINVAL;
-			}
 			port->iotype = UPIO_UNKNOWN;
 			break;
 		}
+	}
+
+	if (!use_defaults && port->iotype == UPIO_UNKNOWN) {
+		dev_err(dev, "Unsupported reg-io-width (%u)\n", value);
+		return -EINVAL;
 	}
 
 	/* Read the address mapping base offset (default: no offset) */

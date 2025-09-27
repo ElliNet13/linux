@@ -40,6 +40,7 @@ SECTIONS
 		*(.rodata.*)
 		_erodata = . ;
 	}
+	EXCEPTION_TABLE(16)
 	.got : {
 		*(.got)
 	}
@@ -109,6 +110,12 @@ SECTIONS
 #ifdef CONFIG_KERNEL_UNCOMPRESSED
 	. = ALIGN(PAGE_SIZE);
 	. += AMODE31_SIZE;		/* .amode31 section */
+
+	/*
+	 * Make sure the location counter is not less than TEXT_OFFSET.
+	 * _SEGMENT_SIZE is not available, use ALIGN(1 << 20) instead.
+	 */
+	. = MAX(TEXT_OFFSET, ALIGN(1 << 20));
 #else
 	. = ALIGN(8);
 #endif
@@ -159,7 +166,6 @@ SECTIONS
 	/DISCARD/ : {
 		COMMON_DISCARDS
 		*(.eh_frame)
-		*(__ex_table)
 		*(*__ksymtab*)
 		*(___kcrctab*)
 	}
